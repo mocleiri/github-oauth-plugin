@@ -97,14 +97,35 @@ public class GithubSecurityRealm extends SecurityRealm {
 	private String clientID;
 	private String clientSecret;
 
+
+	private boolean authenticatedUserReadPermission;
+
+	private boolean allowGithubWebHookPermission;
+
+	private boolean allowCcTrayPermission;
+
+	private boolean allowAnonymousReadPermission;
+
+	private GithubOAuthMembershipLogic logic;
+	
+	// ACL related
+	
+
 	@DataBoundConstructor
 	public GithubSecurityRealm(String githubUri, String clientID,
-			String clientSecret) {
+			String clientSecret, boolean authenticatedUserReadPermission, boolean allowGithubWebHookPermission, boolean allowCcTrayPermission, boolean allowAnonymousReadPermission) {
 		super();
 
 		this.githubUri = Util.fixEmptyAndTrim(githubUri);
 		this.clientID = Util.fixEmptyAndTrim(clientID);
 		this.clientSecret = Util.fixEmptyAndTrim(clientSecret);
+		
+		this.authenticatedUserReadPermission = authenticatedUserReadPermission;
+		this.allowGithubWebHookPermission = allowGithubWebHookPermission;
+		this.allowCcTrayPermission = allowCcTrayPermission;
+		this.allowAnonymousReadPermission = allowAnonymousReadPermission;
+		
+		createLogic();
 
 	}
 
@@ -136,6 +157,27 @@ public class GithubSecurityRealm extends SecurityRealm {
 		this.clientSecret = clientSecret;
 	}
 
+	
+	private void setAuthenticatedUserReadPermission(
+			boolean authenticatedUserReadPermission) {
+		this.authenticatedUserReadPermission = authenticatedUserReadPermission;
+	}
+
+	private void setAllowGithubWebHookPermission(
+			boolean allowGithubWebHookPermission) {
+		this.allowGithubWebHookPermission = allowGithubWebHookPermission;
+	}
+
+	private void setAllowCcTrayPermission(boolean allowCcTrayPermission) {
+		this.allowCcTrayPermission = allowCcTrayPermission;
+	}
+
+	private void setAllowAnonymousReadPermission(
+			boolean allowAnonymousReadPermission) {
+		this.allowAnonymousReadPermission = allowAnonymousReadPermission;
+	}
+
+
 	public static final class ConverterImpl implements Converter {
 
 		public boolean canConvert(Class type) {
@@ -158,6 +200,24 @@ public class GithubSecurityRealm extends SecurityRealm {
 			writer.startNode("clientSecret");
 			writer.setValue(realm.getClientSecret());
 			writer.endNode();
+			
+			
+			writer.startNode("authenticatedUserReadPermission");
+			writer.setValue(String.valueOf(realm.isAuthenticatedUserReadPermission()));
+			writer.endNode();
+
+			writer.startNode("allowGithubWebHookPermission");
+			writer.setValue(String.valueOf(realm.isAllowGithubWebHookPermission()));
+			writer.endNode();
+
+			writer.startNode("allowCcTrayPermission");
+			writer.setValue(String.valueOf(realm.isAllowCcTrayPermission()));
+			writer.endNode();
+
+			writer.startNode("allowAnonymousReadPermission");
+			writer.setValue(String.valueOf(realm.isAllowAnonymousReadPermission()));
+			writer.endNode();
+			
 			
 		}
 
@@ -203,7 +263,9 @@ public class GithubSecurityRealm extends SecurityRealm {
 			if (realm.getGithubUri() == null) {
 				realm.setGithubUri(DEFAULT_URI);
 			}
-
+			
+			realm.createLogic();
+			
 			return realm;
 		}
 
@@ -216,7 +278,20 @@ public class GithubSecurityRealm extends SecurityRealm {
 				realm.setClientSecret(value);
 			} else if (node.toLowerCase().equals("githuburi")) {
 				realm.setGithubUri(value);
-			} else
+			}
+			else if (node.toLowerCase().equals("authenticatedUserReadPermission")) {
+				realm.setAuthenticatedUserReadPermission(Boolean.valueOf(value));
+			}
+			else if (node.toLowerCase().equals("allowGithubWebHookPermission")) {
+				realm.setAllowGithubWebHookPermission(Boolean.valueOf(value));
+			}
+			else if (node.toLowerCase().equals("allowCcTrayPermission")) {
+				realm.setAllowCcTrayPermission(Boolean.valueOf(value));
+			}
+			else if (node.toLowerCase().equals("allowAnonymousReadPermission")) {
+				realm.setAllowAnonymousReadPermission(Boolean.valueOf(value));
+			}
+			else
 				throw new ConversionException("invalid node value = " + node);
 
 		}
@@ -229,6 +304,12 @@ public class GithubSecurityRealm extends SecurityRealm {
 	public String getGithubUri() {
 
 		return githubUri;
+	}
+
+	public void createLogic() {
+		
+		this.logic = new GithubOAuthMembershipLogic(authenticatedUserReadPermission, allowGithubWebHookPermission, allowCcTrayPermission, allowAnonymousReadPermission);
+		
 	}
 
 	/**
@@ -245,11 +326,28 @@ public class GithubSecurityRealm extends SecurityRealm {
 		return clientSecret;
 	}
 
+	
 	// @Override
 	// public Filter createFilter(FilterConfig filterConfig) {
 	//
 	// return new GithubOAuthAuthenticationFilter();
 	// }
+
+	public boolean isAuthenticatedUserReadPermission() {
+		return authenticatedUserReadPermission;
+	}
+
+	public boolean isAllowGithubWebHookPermission() {
+		return allowGithubWebHookPermission;
+	}
+
+	public boolean isAllowCcTrayPermission() {
+		return allowCcTrayPermission;
+	}
+
+	public boolean isAllowAnonymousReadPermission() {
+		return allowAnonymousReadPermission;
+	}
 
 	public HttpResponse doCommenceLogin(StaplerRequest request, @Header("Referer") final String referer)
 			throws IOException {
@@ -467,4 +565,8 @@ public class GithubSecurityRealm extends SecurityRealm {
 	private static final Logger LOGGER = Logger.getLogger(GithubSecurityRealm.class.getName());
 
     private static final String REFERER_ATTRIBUTE = GithubSecurityRealm.class.getName()+".referer";
+
+	public GithubOAuthMembershipLogic getMembershipLogic() {
+		return logic;
+	}
 }
